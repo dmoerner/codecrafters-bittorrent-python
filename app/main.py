@@ -13,7 +13,11 @@ def decode_bencode(bencoded_value):
         first_colon_index = bencoded_value.find(b":")
         if first_colon_index == -1:
             raise ValueError("Invalid encoded value")
-        return bencoded_value[first_colon_index+1:]
+        length_string = int(bencoded_value[:first_colon_index])
+        decoded_string = bencoded_value[first_colon_index+1:]
+        if length_string != len(decoded_string):
+            raise ValueError("Encoded string is not the expected length.")
+        return decoded_string
     else:
         raise NotImplementedError("Only strings are supported at the moment")
 
@@ -22,7 +26,7 @@ def main():
     command = sys.argv[1]
 
     # You can use print statements as follows for debugging, they'll be visible when running tests.
-    print("Logs from your program will appear here!")
+    #print("Logs from your program will appear here!")
 
     if command == "decode":
         bencoded_value = sys.argv[2].encode()
@@ -38,7 +42,7 @@ def main():
             raise TypeError(f"Type not serializable: {type(data)}")
 
         # Uncomment this block to pass the first stage
-        # print(json.dumps(decode_bencode(bencoded_value), default=bytes_to_str))
+        print(json.dumps(decode_bencode(bencoded_value), default=bytes_to_str))
     else:
         raise NotImplementedError(f"Unknown command {command}")
 
