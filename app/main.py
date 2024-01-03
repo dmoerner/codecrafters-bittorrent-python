@@ -18,8 +18,17 @@ def decode_bencode(bencoded_value):
         if length_string != len(decoded_string):
             raise ValueError("Encoded string is not the expected length.")
         return decoded_string
+    elif (chr(bencoded_value[0]) == 'i' and chr(bencoded_value[-1]) == 'e'):
+        decoded_string = bencoded_value[1:-1]
+        if not decoded_string:
+            raise ValueError("Expected integer, but found null value.")
+        try:
+            decoded_int = int(decoded_string)
+        except ValueError:
+            raise ValueError("Expected integer, but input is not an integer.")
+        return decoded_int
     else:
-        raise NotImplementedError("Only strings are supported at the moment")
+        raise NotImplementedError("Only strings and integers are supported at the moment")
 
 
 def main():
