@@ -1,9 +1,9 @@
 import json
 import sys
-
+import socket
 import hashlib
-import urllib.parse
 import requests
+import struct
 
 def decode_string(bencoded_value):
     first_colon_index = bencoded_value.find(b":")
@@ -187,6 +187,35 @@ def main():
             peers = split_peers(decoded_result["peers"])
             for p in peers:
                 print(p)
+    elif command == "handshake":
+        if len(sys.argv) != 4:
+            raise NotImplementedError(f"Usage: {sys.argv[0]} handshake filename <peer_ip>:<peer_port>")
+        with open(sys.argv[2], "rb") as f:
+            bencoded_content = f.read()
+            decoded_value, remainder = decode_bencode(bencoded_content)
+            if remainder:
+                raise ValueError("Undecoded remainder.")
+
+            peer_string = sys.argv[3]
+
+            peer_string_colon = peer_string.find(":")
+            ip = peer_string[:peer_string_colon]
+            port = int(peer_string[peer_string_colon+1:])
+
+            length_prefix = struct.pack('>B', 19)
+            protocol_string = b'BitTorrent protocol'
+            reserved_bytes = b'\x00' * 8
+            info_hash = hashlib.sha1(bencode(decoded_value["info"])).digest()
+            peer_id = b'00112233445566778899'
+            message = length_prefix + protocol_string + reserved_bytes + info_hash + peer_id
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.connect((ip, port))
+            s.send(message)
+            # We set it longer, since there are extension bytes.
+            received_message = s.recv(1024)
+            received_id = received_message[48:68].hex()
+            print("Peer ID:", received_id)
+            s.close()
 
     else:
         raise NotImplementedError(f"Unknown command {command}")
