@@ -4,61 +4,67 @@ import sys
 # import bencodepy - available if you need it!
 # import requests - available if you need it!
 
-# Going to try this with a global variable
-bencoded_value = ''
+def decode_string(bencoded_value):
+    first_colon_index = bencoded_value.find(b":")
+    if first_colon_index == -1:
+        raise ValueError("Not a string")
+    length_string = int(bencoded_value[:first_colon_index])
+    decoded_string = bencoded_value[first_colon_index+1:first_colon_index+1+length_string]
+    bencoded_remainder = bencoded_value[first_colon_index+1+length_string:]
+    return decoded_string, bencoded_remainder
 
-def decode_bencode():
-    global bencoded_value
+def decode_int(bencoded_value):
+    if chr(bencoded_value[0]) != 'i':
+        raise ValueError("Not an integer")
+    end_int = bencoded_value.find(b"e")
+    if end_int == -1:
+        raise ValueError("Not an integer")
+    decoded_int = int(bencoded_value[1:end_int])
+    bencoded_remainder = bencoded_value[end_int+1:]
+    return decoded_int, bencoded_remainder
+
+def decode_list(bencoded_value):
+    if chr(bencoded_value[0]) != 'l':
+        raise ValueError("Not a list")
+    bencoded_remainder = bencoded_value[1:]
+    decoded_list = []
+    while chr(bencoded_remainder[0]) != 'e':
+        decoded_value, bencoded_remainder = decode_bencode(bencoded_remainder)
+        decoded_list.append(decoded_value)
+    return decoded_list, bencoded_remainder[1:]
+
+def decode_dict(bencoded_value):
+    if chr(bencoded_value[0]) != 'd':
+        raise ValueError("Not a dict")
+    bencoded_remainder = bencoded_value[1:]
+    decoded_dict = {}
+    while chr(bencoded_remainder[0]) != 'e':
+        decoded_key, bencoded_remainder = decode_string(bencoded_remainder)
+        decoded_value, bencoded_remainder = decode_bencode(bencoded_remainder)
+        decoded_dict[decoded_key.decode()] = decoded_value
+    return decoded_dict, bencoded_remainder[1:]
+
+def decode_bencode(bencoded_value):
     if chr(bencoded_value[0]).isdigit():
-        first_colon_index = bencoded_value.find(b":")
-        if first_colon_index == -1:
-            raise ValueError("Invalid encoded value")
-        length_string = int(bencoded_value[:first_colon_index])
-        decoded_string = bencoded_value[first_colon_index+1:first_colon_index+1+length_string]
-        bencoded_value = bencoded_value[first_colon_index+1+length_string:]
-        return decoded_string
-    elif (chr(bencoded_value[0]) == 'i'):
-        end_int = bencoded_value.find(b"e")
-        decoded_string = bencoded_value[1:end_int]
-        bencoded_remainder = bencoded_value[end_int+1:]
-        if not decoded_string:
-            raise ValueError("Expected integer, but found null value.")
-        try:
-            decoded_int = int(decoded_string)
-        except ValueError:
-            raise ValueError("Expected integer, but input is not an integer.")
-        bencoded_value = bencoded_value[end_int+1:]
-        return decoded_int
-    elif (chr(bencoded_value[0]) == 'l'):
-        bencoded_value = bencoded_value[1:]
-        decoded_list=[]
-        # Some duplication here, but we want to handle the case where list is empty.
-        if chr(bencoded_value[0]) == 'e':
-            bencoded_value = bencoded_value[1:]
-            return decoded_list
-        while bencoded_value:
-            next_value = decode_bencode()
-            decoded_list.append(next_value)
-            if chr(bencoded_value[0]) == 'e':
-                bencoded_value = bencoded_value[1:]
-                return decoded_list
-    # This could really use some error checking.
+        return decode_string(bencoded_value)
+    elif chr(bencoded_value[0]) == 'i':
+        return decode_int(bencoded_value)
+    elif chr(bencoded_value[0]) == 'l':
+        return decode_list(bencoded_value)
     elif chr(bencoded_value[0]) == 'd':
-        bencoded_value = bencoded_value[1:]
-        decoded_dict = {}
-        if chr(bencoded_value[0]) == 'e':
-            bencoded_value = bencoded_value[1:]
-            return decoded_dict
-        while bencoded_value:
-            key = decode_bencode()
-            value = decode_bencode()
-            decoded_dict[key.decode("utf-8")] = value
-            if chr(bencoded_value[0]) == 'e':
-                bencoded_value = bencoded_value[1:]
-                return decoded_dict
-
+        return decode_dict(bencoded_value)
     else:
-        raise NotImplementedError(f"We only support strings, integers, and lists.")
+        raise NotImplementedError(f"We only support strings, integers, lists, and dicts.")
+
+# json.dumps() can't handle bytes, but bencoded "strings" need to be
+# bytestrings since they might contain non utf-8 characters.
+#
+# Let's convert them to strings for printing to the console.
+def bytes_to_str(data):
+    if isinstance(data, bytes):
+        return data.decode()
+
+    raise TypeError(f"Type not serializable: {type(data)}")
 
 
 def main():
@@ -68,21 +74,23 @@ def main():
     #print("Logs from your program will appear here!")
 
     if command == "decode":
-        global bencoded_value
         bencoded_value = sys.argv[2].encode()
 
-        # json.dumps() can't handle bytes, but bencoded "strings" need to be
-        # bytestrings since they might contain non utf-8 characters.
-        #
-        # Let's convert them to strings for printing to the console.
-        def bytes_to_str(data):
-            if isinstance(data, bytes):
-                return data.decode()
-
-            raise TypeError(f"Type not serializable: {type(data)}")
-
         # Uncomment this block to pass the first stage
-        print(json.dumps(decode_bencode(), default=bytes_to_str))
+        decoded_value, remainder = decode_bencode(bencoded_value)
+
+        if remainder:
+            raise ValueError("Undecoded remainder.")
+
+        print(json.dumps(decoded_value, default=bytes_to_str))
+
+    elif command == "info":
+        if len(sys.argv) != 3:
+            raise NotImplementedError(f"Usage: {sys.argv[0]} info filename")
+        with open(sys.argv[2], "rb") as f:
+            for line in f:
+                print(bytes_to_str(line))
+
     else:
         raise NotImplementedError(f"Unknown command {command}")
 
