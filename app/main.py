@@ -2,9 +2,8 @@ import json
 import sys
 
 import hashlib
-
-# import bencodepy - available if you need it!
-# import requests - available if you need it!
+import urllib.parse
+import requests
 
 def decode_string(bencoded_value):
     first_colon_index = bencoded_value.find(b":")
@@ -102,6 +101,16 @@ def piece_hashes(pieces):
         raise ValueError("Piece hashes do not add up to a multiple of", n, "bytes.")
     return [pieces[i:i+n] for i in range(0, len(pieces), n)]
 
+def split_peers(peers):
+    if len(peers) % 6 != 0:
+        raise ValueError("Peer list from tracker does not divide into 6 bytes; did you use compact?")
+    uncompacted_peers = []
+    for peer in [peers[i:i+6] for i in range(0, len(peers), 6)]:
+        ip = str(peer[0]) + '.' + str(peer[1]) + '.' + str(peer[2]) + '.' + str(peer[3]) 
+        port = str(int.from_bytes(peer[4:], byteorder='big', signed=False))
+        uncompacted_peers.append(ip + ":" + port)
+    return uncompacted_peers
+
 # json.dumps() can't handle bytes, but bencoded "strings" need to be
 # bytestrings since they might contain non utf-8 characters.
 #
@@ -151,6 +160,33 @@ def main():
             for h in hashes:
                 print(h.hex())
 
+    elif command == "peers":
+        if len(sys.argv) != 3:
+            raise NotImplementedError(f"Usage: {sys.argv[0]} peers filename")
+        with open(sys.argv[2], "rb") as f:
+            bencoded_content = f.read()
+            decoded_value, remainder = decode_bencode(bencoded_content)
+
+            if remainder:
+                raise ValueError("Undecoded remainder.")
+
+            # Note: The requests library automatically encodes these parameters properly, including the info_hash
+            tracker_url = decoded_value["announce"].decode()
+            info_hash = hashlib.sha1(bencode(decoded_value["info"])).digest()
+            peer_id = "00112233445566778899"
+            port = 6881
+            uploaded = 0
+            downloaded = 0
+            left = decoded_value["info"]["length"]
+            compact = 1
+            params = dict(info_hash=info_hash, peer_id=peer_id, port=port, uploaded=uploaded, downloaded=downloaded, left=left, compact=compact)
+            
+            result = requests.get(tracker_url, params=params)
+            
+            decoded_result = decode_bencode(result.content)[0]
+            peers = split_peers(decoded_result["peers"])
+            for p in peers:
+                print(p)
 
     else:
         raise NotImplementedError(f"Unknown command {command}")
