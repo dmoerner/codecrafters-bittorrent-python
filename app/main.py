@@ -32,6 +32,10 @@ def decode_bencode():
     elif (chr(bencoded_value[0]) == 'l'):
         bencoded_value = bencoded_value[1:]
         decoded_list=[]
+        # Some duplication here, but we want to handle the case where list is empty.
+        if chr(bencoded_value[0]) == 'e':
+            bencoded_value = bencoded_value[1:]
+            return decoded_list
         while bencoded_value:
             next_value = decode_bencode()
             decoded_list.append(next_value)
