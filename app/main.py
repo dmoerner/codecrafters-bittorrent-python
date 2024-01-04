@@ -1,6 +1,8 @@
 import json
 import sys
 
+import hashlib
+
 # import bencodepy - available if you need it!
 # import requests - available if you need it!
 
@@ -56,6 +58,43 @@ def decode_bencode(bencoded_value):
     else:
         raise NotImplementedError(f"We only support strings, integers, lists, and dicts.")
 
+def bencode_string(unencoded_value):
+    length = len(unencoded_value)
+    return (str(length) + ":" + unencoded_value).encode()
+
+def bencode_bytes(unencoded_value):
+    length = len(unencoded_value)
+    return str(length).encode() + b':' + unencoded_value
+
+def bencode_int(unencoded_value):
+    return ("i" + str(unencoded_value) + "e").encode()
+
+def bencode_list(unencoded_value):
+    result = b'l'
+    for i in unencoded_value:
+        result += bencode(i)
+    return result + b'e'
+
+def bencode_dict(unencoded_value):
+    result = b'd'
+    for k in unencoded_value:
+        result += bencode(k) + bencode(unencoded_value[k])
+    return result + b'e'
+
+def bencode(unencoded_value):
+    if isinstance(unencoded_value, str):
+        return bencode_string(unencoded_value)
+    elif isinstance(unencoded_value, bytes):
+        return bencode_bytes(unencoded_value)
+    elif isinstance(unencoded_value, int):
+        return bencode_int(unencoded_value)
+    elif isinstance(unencoded_value, list):
+        return bencode_list(unencoded_value)
+    elif isinstance(unencoded_value, dict):
+        return bencode_dict(unencoded_value)
+    else:
+        raise ValueError("Can only bencode strings, ints, lists, or dicts.")
+
 # json.dumps() can't handle bytes, but bencoded "strings" need to be
 # bytestrings since they might contain non utf-8 characters.
 #
@@ -96,6 +135,9 @@ def main():
 
             print("Tracker URL:", decoded_value["announce"].decode())
             print("Length:", decoded_value["info"]["length"])
+
+            info_hash = hashlib.sha1(bencode(decoded_value["info"])).hexdigest()
+            print("Info Hash:", info_hash)
 
 
     else:
