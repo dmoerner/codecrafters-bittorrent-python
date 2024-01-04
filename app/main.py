@@ -95,6 +95,13 @@ def bencode(unencoded_value):
     else:
         raise ValueError("Can only bencode strings, ints, lists, or dicts.")
 
+# Use list comprehension to return a split string of hashes.
+def piece_hashes(pieces):
+    n = 20
+    if len(pieces) % n != 0:
+        raise ValueError("Piece hashes do not add up to a multiple of", n, "bytes.")
+    return [pieces[i:i+n] for i in range(0, len(pieces), n)]
+
 # json.dumps() can't handle bytes, but bencoded "strings" need to be
 # bytestrings since they might contain non utf-8 characters.
 #
@@ -138,6 +145,11 @@ def main():
 
             info_hash = hashlib.sha1(bencode(decoded_value["info"])).hexdigest()
             print("Info Hash:", info_hash)
+            print("Piece Length:", decoded_value["info"]["piece length"])
+            print("Piece Hashes:")
+            hashes = piece_hashes(decoded_value["info"]["pieces"])
+            for h in hashes:
+                print(h.hex())
 
 
     else:
