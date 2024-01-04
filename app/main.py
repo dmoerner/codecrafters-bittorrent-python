@@ -42,6 +42,21 @@ def decode_bencode():
             if chr(bencoded_value[0]) == 'e':
                 bencoded_value = bencoded_value[1:]
                 return decoded_list
+    # This could really use some error checking.
+    elif chr(bencoded_value[0]) == 'd':
+        bencoded_value = bencoded_value[1:]
+        decoded_dict = {}
+        if chr(bencoded_value[0]) == 'e':
+            bencoded_value = bencoded_value[1:]
+            return decoded_dict
+        while bencoded_value:
+            key = decode_bencode()
+            value = decode_bencode()
+            decoded_dict[key.decode("utf-8")] = value
+            if chr(bencoded_value[0]) == 'e':
+                bencoded_value = bencoded_value[1:]
+                return decoded_dict
+
     else:
         raise NotImplementedError(f"We only support strings, integers, and lists.")
 
