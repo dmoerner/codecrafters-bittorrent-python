@@ -7,11 +7,6 @@ import sys
 # Going to try this with a global variable
 bencoded_value = ''
 
-# Examples:
-#
-# - decode_bencode(b"5:hello") -> b"hello"
-# - decode_bencode(b"10:hello12345") -> b"hello12345"
-
 def decode_bencode():
     global bencoded_value
     if chr(bencoded_value[0]).isdigit():
