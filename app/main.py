@@ -88,8 +88,15 @@ def main():
         if len(sys.argv) != 3:
             raise NotImplementedError(f"Usage: {sys.argv[0]} info filename")
         with open(sys.argv[2], "rb") as f:
-            for line in f:
-                print(bytes_to_str(line))
+            bencoded_content = f.read()
+            decoded_value, remainder = decode_bencode(bencoded_content)
+
+            if remainder:
+                raise ValueError("Undecoded remainder.")
+
+            print("Tracker URL:", decoded_value["announce"].decode())
+            print("Length:", decoded_value["info"]["length"])
+
 
     else:
         raise NotImplementedError(f"Unknown command {command}")
