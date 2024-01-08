@@ -4,6 +4,7 @@ import socket
 import hashlib
 import requests
 import struct
+import os
 
 def decode_string(bencoded_value):
     first_colon_index = bencoded_value.find(b":")
@@ -298,6 +299,26 @@ def download_piece(outputfile, filename, piececount):
     # Return piece completed and location
     return piececount, outputfile
 
+# TODO: Refactor download_pieces to use a buffer instead of intermediate files.
+# TODO: Use a work queue to retry pieces and try different peers.
+def download(outputfile, filename):
+    decoded_value = decode_torrentfile(filename)
+    total_pieces = len(piece_hashes(decoded_value["info"]["pieces"]))
+
+    piecefiles = []
+    for piece in range(0, total_pieces):
+        p, o = download_piece("/tmp/test-" + str(piece), filename, piece)
+        piecefiles.append(o)
+
+    with open(outputfile, "ab") as result_file:
+        for piecefile in piecefiles:
+            with open(piecefile, "rb") as piece_file:
+                result_file.write(piece_file.read()) 
+            os.remove(piecefile)
+
+    
+    
+
 
 # json.dumps() can't handle bytes, but bencoded "strings" need to be
 # bytestrings since they might contain non utf-8 characters.
@@ -368,6 +389,16 @@ def main():
 
         p, o = download_piece(outputfile, filename, int(piececount))
         print("Piece %i downloaded to %s" % (p, o))
+
+    elif command == "download":
+        if len(sys.argv) != 5:
+            raise NotImplementedError(f"Usage: {sys.argv[0]} download -o output filename")
+
+        outputfile = sys.argv[3]
+        filename = sys.argv[4]
+
+        download(outputfile, filename)
+        print("Download %s to %s" % (filename, outputfile))
 
     else:
         raise NotImplementedError(f"Unknown command {command}")
